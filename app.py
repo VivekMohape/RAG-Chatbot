@@ -11,7 +11,7 @@ from groq_models import generate_answer
 # basic config
 # ----------------------------
 st.set_page_config(
-    page_title="Retail Schema Aware Chatbot",
+    page_title="Rag Based Chatbot",
     layout="wide"
 )
 
@@ -42,7 +42,7 @@ def init_schema_index():
 # ----------------------------
 # UI
 # ----------------------------
-st.title("Retail Schema Aware Chatbot")
+st.title("RAG based Chatbot")
 
 st.markdown(
     "Schema-first RAG chatbot over large Excel data "
