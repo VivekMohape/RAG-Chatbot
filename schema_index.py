@@ -7,8 +7,8 @@ from schema_enrich import enrich_column
 _model = SentenceTransformer("BAAI/bge-m3")
 
 # global state
-_index = None
-_schema_cols = []
+_faiss_index = None
+_schema_columns = []
 
 
 def build_schema_index(
@@ -16,58 +16,56 @@ def build_schema_index(
     table_name: str = "transactions"
 ):
     """
-    Build FAISS index over schema columns.
-    Runs once per app lifecycle.
+    Build FAISS index over table schema.
+    This must run before any query.
     """
-    global _index, _schema_cols
+    global _faiss_index, _schema_columns
 
-    # do not rebuild if already exists
-    if _index is not None:
+    if _faiss_index is not None:
         return
 
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-
-    # fetch column names
     cursor.execute(f"PRAGMA table_info({table_name})")
-    cols = cursor.fetchall()
+    columns = cursor.fetchall()
     conn.close()
 
-    if not cols:
-        raise RuntimeError("No columns found in database table")
+    if not columns:
+        raise RuntimeError("No schema found in database")
 
     texts = []
-    _schema_cols = []
+    _schema_columns = []
 
-    for col in cols:
+    for col in columns:
         col_name = col[1]
         texts.append(enrich_column(col_name))
-        _schema_cols.append(col_name)
+        _schema_columns.append(col_name)
 
-    # create embeddings
-    vectors = _model.encode(
+    embeddings = _model.encode(
         texts,
         normalize_embeddings=True
     )
 
-    # create FAISS index
-    dim = vectors.shape[1]
-    _index = faiss.IndexFlatIP(dim)
-    _index.add(vectors)
+    dim = embeddings.shape[1]
+    _faiss_index = faiss.IndexFlatIP(dim)
+    _faiss_index.add(embeddings)
 
 
 def select_schema(query: str, top_k: int = 6):
     """
-    Select relevant columns based on query semantics.
+    Return top-k relevant schema columns.
     """
-    if _index is None:
-        raise RuntimeError("Schema index not initialized")
+    if _faiss_index is None:
+        raise RuntimeError(
+            "Schema index not initialized. "
+            "Call build_schema_index() first."
+        )
 
     query_vec = _model.encode(
         [query],
         normalize_embeddings=True
     )
 
-    _, indices = _index.search(query_vec, top_k)
+    _, indices = _faiss_index.search(query_vec, top_k)
 
-    return [_schema_cols[i] for i in indices[0]]
+    return [_schema_columns[i] for i in indices[0]]
