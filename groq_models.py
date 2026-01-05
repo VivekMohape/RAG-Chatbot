@@ -21,7 +21,7 @@ Data:
                 "role": "system",
                 "content": (
                     "Answer strictly from the provided data. "
-                    "If the answer is not present, say it is not available."
+                    "If the answer is not available, say so clearly."
                 )
             },
             {
@@ -34,5 +34,4 @@ Data:
     )
 
     latency_ms = (perf_counter() - start) * 1000
-
     return completion.choices[0].message.content, latency_ms
