@@ -2,6 +2,7 @@ import os
 import time
 import sqlite3
 import streamlit as st
+import pandas as pd
 
 from schema_index import build_schema_index, select_schema
 from retriever import retrieve_rows
@@ -19,8 +20,25 @@ if not api_key:
     st.info("Enter your Groq API key to continue")
     st.stop()
 
+os.makedirs("data", exist_ok=True)
+
 if not os.path.exists(DB_PATH):
-    st.error("Database not found. Run ingestion first.")
+    st.warning("Database not found. Upload Excel file to ingest.")
+
+    uploaded_file = st.file_uploader(
+        "Upload Online Retail Excel file",
+        type=["xlsx"]
+    )
+
+    if uploaded_file:
+        df = pd.read_excel(uploaded_file)
+        conn = sqlite3.connect(DB_PATH)
+        df.to_sql(TABLE, conn, if_exists="replace", index=False)
+        conn.close()
+
+        st.success("Ingestion complete. Please refresh the app.")
+        st.stop()
+
     st.stop()
 
 @st.cache_resource
@@ -36,21 +54,30 @@ model = st.selectbox(
 
 query = st.text_input("Ask a question")
 
+if "metrics" not in st.session_state:
+    st.session_state.metrics = []
+
 if query:
     t0 = time.perf_counter()
-    schema = select_schema(query)
+    schema_cols = select_schema(query)
     schema_ms = (time.perf_counter() - t0) * 1000
 
-    rows, sql_ms = retrieve_rows(schema, DB_PATH, TABLE)
+    rows, sql_ms = retrieve_rows(schema_cols, DB_PATH, TABLE)
 
     answer, llm_ms = generate_answer(
-        query, rows, model, api_key
+        query=query,
+        context=rows,
+        model_name=model,
+        api_key=api_key
     )
 
     st.subheader("Answer")
     st.write(answer)
 
-    st.subheader("Latency (ms)")
+    st.subheader("Schema Used")
+    st.write(schema_cols)
+
+    st.subheader("Latency Metrics (ms)")
     st.json({
         "schema": round(schema_ms, 2),
         "sql": round(sql_ms, 2),
