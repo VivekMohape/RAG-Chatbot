@@ -4,10 +4,6 @@ import sqlite3
 import streamlit as st
 import pandas as pd
 
-from schema_index import build_schema_index, select_schema
-from retriever import retrieve_rows
-from groq_models import generate_answer
-
 st.set_page_config(page_title="RAG Chatbot", layout="wide")
 
 DB_PATH = "data/retail.db"
@@ -36,10 +32,14 @@ if not os.path.exists(DB_PATH):
         df.to_sql(TABLE, conn, if_exists="replace", index=False)
         conn.close()
 
-        st.success("Ingestion complete. Please refresh the app.")
+        st.success("Ingestion complete. Please refresh the page.")
         st.stop()
 
     st.stop()
+
+from schema_index import build_schema_index, select_schema
+from retriever import retrieve_rows
+from groq_models import generate_answer
 
 @st.cache_resource
 def init_schema():
@@ -47,7 +47,7 @@ def init_schema():
 
 init_schema()
 
-model = st.selectbox(
+model_name = st.selectbox(
     "Select model",
     ["llama-3.3-70b-versatile", "openai-oss-120b"]
 )
@@ -67,7 +67,7 @@ if query:
     answer, llm_ms = generate_answer(
         query=query,
         context=rows,
-        model_name=model,
+        model_name=model_name,
         api_key=api_key
     )
 
